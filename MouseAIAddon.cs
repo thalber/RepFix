@@ -1,27 +1,31 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using UnityEngine;
-using AssemblyCSharp;
+﻿using UnityEngine;
 
-namespace RepFix
+namespace WaspPile.RepFix
 {
-    public class AltMouseAI : MouseAI, FriendTracker.IHaveFriendTracker, IUseARelationshipTracker
+    public class AltMouseAI : MouseAI, FriendTracker.IHaveFriendTracker, IUseARelationshipTracker, IReactToSocialEvents
     {
         public AltMouseAI (AbstractCreature absc, World world) : base (absc, world)
         {
             this.AddModule(new FriendTracker(this));
             Debug.Log("Alternative mouse AI initiated: " + this.creature.ID.ToString());
+			this.utilityComparer.AddComparedModule(this.friendTracker, null, 2f, 1.1f);
         }
 
         public void GiftRecieved(SocialEventRecognizer.OwnedItemOnGround gift)
         {
-            
+			this.friendTracker.friend = gift.owner;
+			
         }
 
         CreatureTemplate.Relationship IUseARelationshipTracker.UpdateDynamicRelationship(RelationshipTracker.DynamicRelationship dRelation)
         {
+			if (dRelation.trackerRep.representedCreature.creatureTemplate.type == CreatureTemplate.Type.Slugcat)
+            {
+				this.friendTracker.friend = dRelation.trackerRep.representedCreature.realizedCreature;
+				this.friendTracker.followClosestFriend = true;
+				return new CreatureTemplate.Relationship(CreatureTemplate.Relationship.Type.Ignores, 0f);
+
+			}
 			if (dRelation.trackerRep.VisualContact)
 			{
 				dRelation.state.alive = dRelation.trackerRep.representedCreature.state.alive;
@@ -52,12 +56,35 @@ namespace RepFix
             }
 			return result;
 		}
-
 		AIModule IUseARelationshipTracker.ModuleToTrackRelationship(CreatureTemplate.Relationship relationship)
         {
 			if (relationship.type == CreatureTemplate.Relationship.Type.Afraid) return this.threatTracker;
 			return null;
         }
 
-	}
+		void IReactToSocialEvents.SocialEvent(SocialEventRecognizer.EventID ID, Creature subjectCrit, Creature objectCrit, PhysicalObject involvedItem)
+        {
+			if (objectCrit != this.mouse) return;
+			Tracker.CreatureRepresentation rep = this.tracker.RepresentationForObject(subjectCrit, false);
+			if (rep == null) return;
+			
+			switch (ID)
+            {
+				
+				case SocialEventRecognizer.EventID.ItemOffering:
+					if (objectCrit == this.mouse) this.friendTracker.ItemOffered(rep, involvedItem);
+					break;
+				default:
+					break;
+            }
+        }
+
+        public override void Update()
+        {
+            base.Update();
+			if (this.friendTracker.friend != null) this.mouse.abstractCreature.abstractAI.SetDestination(this.friendTracker.friendDest);
+        }
+
+    }
+
 }

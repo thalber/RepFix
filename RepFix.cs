@@ -1,15 +1,10 @@
-﻿using System;
+﻿using MonoMod.RuntimeDetour;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using UnityEngine;
-using AssemblyCSharp;
-using MonoMod.RuntimeDetour;
 using System.Reflection;
-using System.IO;
+using UnityEngine;
 
 
-namespace RepFix
+namespace WaspPile.RepFix
 {
     public class RepFixMod : Partiality.Modloader.PartialityMod
     {
@@ -61,15 +56,27 @@ namespace RepFix
                 if (killflag) instance.killHostiles = false;
             }
         }
-
+        public static void Absc_InitAI_Hook(On.AbstractCreature.orig_InitiateAI orig, AbstractCreature instance)
+        {
+            orig(instance);
+            if (instance.creatureTemplate.type == CreatureTemplate.Type.LanternMouse) instance.abstractAI.RealAI = new AltMouseAI(instance, instance.world);
+            
+        }
         public static void Voidspawn_MakeBody_Hook(On.VoidSpawn.orig_ctor orig, VoidSpawn instance, AbstractPhysicalObject apo, float voidmelt, bool daylight)
         {
-            orig(instance, apo, voidmelt, false);
+            orig(instance, apo, voidmelt, daylight);
             foreach (BodyChunk chunk in instance.bodyChunks)
             {
                 chunk.collideWithObjects = true;
             }
             instance.collisionLayer = 1;
+        }
+
+        public static void Room_Loaded_Hook(On.Room.orig_Loaded orig, Room instance)
+        {
+            orig(instance);
+            Debug.Log(string.Empty);
+            
         }
 
         public static OptionalUI.OptionInterface LoadOI()
@@ -102,10 +109,19 @@ namespace RepFix
         public override void OnEnable()
         {
             base.OnEnable();
+            if (RF_CFG.SCAREDSPIDERS) StaticWorld.EstablishRelationship(CreatureTemplate.Type.BigSpider, CreatureTemplate.Type.Slugcat, new CreatureTemplate.Relationship(CreatureTemplate.Relationship.Type.Afraid, 0.5f));
+            StaticWorld.EstablishRelationship(CreatureTemplate.Type.LanternMouse, CreatureTemplate.Type.Slugcat, new CreatureTemplate.Relationship(CreatureTemplate.Relationship.Type.Ignores, 0f));
             HOOKS.Add(new Hook(typeof(LizardAI).GetMethod("IUseARelationshipTracker.UpdateDynamicRelationship", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public), typeof(RepFixMod).GetMethod(nameof(RepFixMod.VariousAIs_UpdateDynRel_Hook))));
             HOOKS.Add(new Hook(typeof(VultureAI).GetMethod("IUseARelationshipTracker.UpdateDynamicRelationship", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public), typeof(RepFixMod).GetMethod(nameof(RepFixMod.VariousAIs_UpdateDynRel_Hook))));
             On.ShelterDoor.KillAllHostiles += new On.ShelterDoor.hook_KillAllHostiles(ShelterDoor_KillHostiles_Hook);
             On.VoidSpawn.ctor += new On.VoidSpawn.hook_ctor(Voidspawn_MakeBody_Hook);
+            On.AbstractCreature.InitiateAI += new On.AbstractCreature.hook_InitiateAI(Absc_InitAI_Hook);
+            //On.Room.Loaded += new On.Room.hook_Loaded(Room_Loaded_Hook);
+
+            this.gs = new GameObject().AddComponent<GarbageScript>();
         }
+
+        private GarbageScript gs;
+
     }
 }

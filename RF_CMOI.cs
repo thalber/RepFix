@@ -1,15 +1,10 @@
-﻿using System;
+﻿using OptionalUI;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Partiality;
-using CompletelyOptional;
-using OptionalUI;
 using UnityEngine;
 
-namespace RepFix
+namespace WaspPile.RepFix
 {
-    class RF_CMOI : OptionInterface
+    internal class RF_CMOI : OptionInterface
     {
         public RF_CMOI() : base (RepFixMod.oneinstance)
         {
